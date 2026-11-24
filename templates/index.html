@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CMIS Module Manager</title>
+  <script>
+  /* Runs before the stylesheet is even fetched. Doing this from app.js instead
+     would paint the default palette first and then swap, which reads as a
+     flash. Only documentElement is touched, so it also survives the wholesale
+     body rewrite the post-update screen does. Key is duplicated in app.js —
+     a test pins the two together. */
+  (function () {
+    var d = document.documentElement, p = {};
+    try { p = JSON.parse(localStorage.getItem('cmis.ui') || 'null') || {}; } catch (e) {}
+    if (p.theme) { d.setAttribute('data-theme', p.theme); }
+    if (p.fontSans) { d.setAttribute('data-font-sans', p.fontSans); }
+    if (typeof p.fontStep === 'number') { d.style.setProperty('--fs-step', p.fontStep + 'px'); }
+    var z = p.scale;
+    if (typeof z !== 'number' || p.scaleAuto !== false) {
+      var w = window.innerWidth;
+      z = w >= 3000 ? 1.5 : w >= 2400 ? 1.35 : w >= 1900 ? 1.15 : 1;
+    }
+    d.style.setProperty('--ui-zoom', z);
+  })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div id="app-shell">
+
+<header>
+  <h1>CMIS Module Manager</h1>
+  <span class="version-badge" id="app-version" title="Application version">v{{ version }}</span>
+  <button class="btn-update" id="btn-check-update"
+          title="Check GitHub for a newer release">↑ Update</button>
+  <div class="status-indicator">
+    <div class="status-dot disconnected" id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+  <!-- Deliberately not a tab: every tab button is disabled until a module is
+       connected, and someone whose UI is too small to read has to be able to
+       fix that first. -->
+  <button class="btn-update" id="btn-settings"
+          title="Display settings — theme, scale, text size, font">&#9881; Display</button>
+</header>
+
+<main>
+  <!-- ===== Sidebar: Connection Panel ===== -->
+  <aside class="sidebar">
+    <h2>Connection</h2>
+
+    <div class="field-group">
+      <label for="sel-backend">Backend</label>
+      <!-- Bench default: a CH341A adapter. Keep this placeholder in sync with
+           DEFAULT_BACKEND in static/app.js so the sidebar shows ch341 before
+           /api/backends resolves too (no flash of a mock profile). -->
+      <select id="sel-backend">
+        <option value="ch341" selected>ch341</option>
+      </select>
+    </div>
+
+    <button class="btn-secondary btn-sm" id="btn-refresh-backends">↻ Refresh Backends</button>
+
+    <div class="field-group">
+      <label for="inp-bus">Bus / Device Index</label>
+      <input type="number" id="inp-bus" value="0" min="0" max="9">
+    </div>
+
+    <div class="field-group">
+      <label for="inp-address">I2C Address (8-bit, hex or dec)</label>
+      <input type="text" id="inp-address" value="0xA0" placeholder="0xA0 or 160">
+    </div>
+
+    <button class="btn-primary" id="btn-connect">Connect</button>
+    <button class="btn-danger" id="btn-disconnect" disabled>Disconnect</button>
+
+    <hr class="divider">
+
+    <h2>Backend Info</h2>
+    <div id="backend-info-area">
+      Select a backend and connect to view info.
+    </div>
+    <div class="sidebar-qr-wrap">
+      <img src="/static/qrcode.jpg" alt="公众号" class="sidebar-qr">
+      <div class="sidebar-qr-label">关注公众号</div>
+    </div>
+    <div class="sidebar-about">
+      CMIS Module Manager <b>v{{ version }}</b><br>
+      OIF CMIS 5.3 · MIT License
+    </div>
+  </aside>
+
+  <!-- ===== Content Area ===== -->
+  <div class="content">
+    <!-- Tab bar -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="info"        disabled>Module Info</button>
+      <button class="tab-btn"        data-tab="monitoring"  disabled>Monitoring</button>
+      <button class="tab-btn"        data-tab="datapath"    disabled>DataPath Config</button>
+      <button class="tab-btn"        data-tab="diagnostics" disabled>Diagnostics</button>
+      <button class="tab-btn"        data-tab="raw"         disabled>Raw Registers</button>
+      <button class="tab-btn"        data-tab="eeprom"      disabled>EEPROM 读/写</button>
+    </nav>
+
+    <!-- ===== Tab: Module Info ===== -->
+    <div class="tab-panel active" id="tab-info">
+      <div class="card">
+        <h3>Identity &amp; Status
+          <button class="btn-secondary btn-sm" id="btn-refresh-info">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr><th>Field</th><th>Value</th><th>Page</th><th>Address<span class="reg-meta">hex</span></th><th>CMIS Definition</th></tr>
+          </thead>
+          <tbody id="tbl-info">
+            <tr><td colspan="5" class="placeholder-text">Connect to a module to view information.</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+    </div>
+
+    <!-- ===== Tab: Monitoring ===== -->
+    <div class="tab-panel" id="tab-monitoring">
+      <div class="card">
+        <h3>Live Monitoring <span id="monitor-all-activated-dot" class="monitor-all-dot" style="display:none"></span></h3>
+
+        <div id="monitor-stale" class="stale-banner" style="display:none"></div>
+
+        <div class="monitoring-controls">
+          <span id="monitor-summary" style="font-family:var(--font-mono);font-size:var(--fs-md)"></span>
+          <label>Refresh:
+            <select id="sel-refresh-interval">
+              <option value="1000">1 s</option>
+              <option value="2000" selected>2 s</option>
+              <option value="5000">5 s</option>
+              <option value="10000">10 s</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <button class="btn-secondary btn-sm" id="btn-refresh-monitor">↻ Now</button>
+        </div>
+
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>Tx Power<span class="reg-meta">11h / 0x9A+(n−1)×2, uint16×0.1µW</span></th>
+              <th>Tx Bias<span class="reg-meta">11h / 0xAA+(n−1)×2, uint16×2µA</span></th>
+              <th>Rx Power<span class="reg-meta">11h / 0xBA+(n−1)×2, uint16×0.1µW</span></th>
+              <th>DataPath State<span class="reg-meta">11h / 0x80–0x83, 4bit/lane</span></th>
+              <th>Config Status<span class="reg-meta">11h / 0xCA–0xCD, 4bit/lane</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbl-monitoring">
+            <tr><td colspan="6" class="placeholder-text">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+</div>
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          Colouring uses the module's own Tx/Rx power alarm thresholds from Page 02h — the same
+          values shown in the Module Thresholds card below.
+        </p>
+      </div>
+
+      <!-- Thresholds card -->
+      <div class="card">
+        <h3>Module Thresholds
+          <button class="btn-secondary btn-sm" id="btn-refresh-thresholds">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr><th>Parameter</th><th>Page / Address</th><th class="th-ha">High Alarm</th><th class="th-la">Low Alarm</th><th class="th-hw">High Warn</th><th class="th-lw">Low Warn</th></tr>
+          </thead>
+          <tbody id="tbl-thresholds">
+            <tr><td colspan="6" class="placeholder-text">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      <!-- Lane Flags card -->
+      <div class="card">
+        <h3>Lane Flags</h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>Tx Fault<span class="reg-meta">11h / 0x87</span></th>
+              <th>Tx LOS<span class="reg-meta">11h / 0x88</span></th>
+              <th>Tx CDR-LOL<span class="reg-meta">11h / 0x89</span></th>
+              <th>Rx LOS<span class="reg-meta">11h / 0x93</span></th>
+              <th>Rx CDR-LOL<span class="reg-meta">11h / 0x94</span></th>
+              <th>Alarms/Warns</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-flags">
+            <tr><td colspan="7" class="placeholder-text">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+    </div>
+
+    <!-- ===== Tab: DataPath Config ===== -->
+    <div class="tab-panel" id="tab-datapath">
+
+      <!-- Module Control card -->
+      <div class="card">
+        <h3>Module Control
+          <button class="btn-secondary btn-sm" id="btn-refresh-control">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr><th>Field</th><th>State</th><th>Register</th><th>Action</th></tr>
+          </thead>
+          <tbody id="tbl-control">
+            <tr><td colspan="4" class="placeholder-text">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+</div>
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          ⚠ Software Reset reinitializes the module — all DataPaths re-enter Init. Use with care.
+        </p>
+      </div>
+
+      <!-- Application Descriptors card -->
+      <div class="card">
+        <h3>Supported Applications
+          <button class="btn-secondary btn-sm" id="btn-refresh-apps">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>AppSel<span class="reg-meta">dec</span></th>
+              <th>Host Interface ID<span class="reg-meta">hex · SFF-8024</span></th>
+              <th>Media Interface ID<span class="reg-meta">hex</span></th>
+              <th>Host Lanes<span class="reg-meta">dec</span></th>
+              <th>Media Lanes<span class="reg-meta">dec</span></th>
+              <th>Host Lane Assign<span class="reg-meta">binary bitmap</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbl-apps">
+            <tr><td colspan="6" class="placeholder-text">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      <div class="card">
+        <h3>DataPath Configuration
+          <span style="display:flex;gap:8px">
+            <button class="btn-secondary btn-sm" id="btn-refresh-datapath">↻ Refresh</button>
+            <button class="btn-primary btn-sm"   id="btn-apply-datapath">Apply</button>
+          </span>
+        </h3>
+
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>AppSelect<span class="reg-meta">10h / 0x91+(n−1), bits [7:4]</span></th>
+              <th>TX Enable<span class="reg-meta">10h / 0x82[n−1] (inv.)</span></th>
+              <th>TX Pol Flip<span class="reg-meta">10h / 0x81[n−1]</span></th>
+              <th>RX Pol Flip<span class="reg-meta">10h / 0x89[n−1]</span></th>
+              <th>DP Deinit<span class="reg-meta">10h / 0x80[n−1]</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbl-datapath">
+            <tr><td colspan="6" class="placeholder-text">Connect to configure DataPath.</td></tr>
+          </tbody>
+        </table>
+</div>
+
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          TX Enable is the inverse of the TX Disable bitmask. AppSelect selects the application code (0–15 per lane).
+          Click <strong>Apply</strong> to write and activate the configuration.
+        </p>
+      </div>
+
+      <!-- Output Controls card -->
+      <div class="card">
+        <h3>Output Controls
+          <span style="display:flex;gap:8px">
+            <button class="btn-secondary btn-sm" id="btn-refresh-squelch">↻ Refresh</button>
+            <button class="btn-primary btn-sm"   id="btn-apply-squelch">Apply</button>
+          </span>
+        </h3>
+        <div class="table-scroll">
+<table class="squelch-table">
+          <thead>
+            <tr>
+              <th style="width:160px">Control</th>
+              <th>L1</th><th>L2</th><th>L3</th><th>L4</th>
+              <th>L5</th><th>L6</th><th>L7</th><th>L8</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--text-muted)">AutoSquelchDisableTx<span class="reg-badge">10h/0x83</span></td>
+              <td id="sq-td-0"></td><td id="sq-td-1"></td><td id="sq-td-2"></td><td id="sq-td-3"></td>
+              <td id="sq-td-4"></td><td id="sq-td-5"></td><td id="sq-td-6"></td><td id="sq-td-7"></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted)">OutputSquelchForceTx<span class="reg-badge">10h/0x84</span></td>
+              <td id="sf-td-0"></td><td id="sf-td-1"></td><td id="sf-td-2"></td><td id="sf-td-3"></td>
+              <td id="sf-td-4"></td><td id="sf-td-5"></td><td id="sf-td-6"></td><td id="sf-td-7"></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted)">OutputDisableRx<span class="reg-badge">10h/0x8A</span></td>
+              <td id="od-td-0"></td><td id="od-td-1"></td><td id="od-td-2"></td><td id="od-td-3"></td>
+              <td id="od-td-4"></td><td id="od-td-5"></td><td id="od-td-6"></td><td id="od-td-7"></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted)">AutoSquelchDisableRx<span class="reg-badge">10h/0x8B</span></td>
+              <td id="rd-td-0"></td><td id="rd-td-1"></td><td id="rd-td-2"></td><td id="rd-td-3"></td>
+              <td id="rd-td-4"></td><td id="rd-td-5"></td><td id="rd-td-6"></td><td id="rd-td-7"></td>
+            </tr>
+          </tbody>
+        </table>
+</div>
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          Checked = bit set (auto-squelch controller disabled / output disabled / squelch forced).
+          CMIS defines no OutputSquelchForceRx counterpart.
+        </p>
+      </div>
+    </div>
+
+    <!-- ===== Tab: Diagnostics ===== -->
+    <div class="tab-panel" id="tab-diagnostics">
+
+      <!-- Loopback card -->
+      <div class="card">
+        <h3>Loopback
+          <span style="display:flex;gap:8px">
+            <button class="btn-secondary btn-sm" id="btn-refresh-loopback">↻ Refresh</button>
+            <button class="btn-primary btn-sm"   id="btn-apply-loopback">Apply</button>
+          </span>
+        </h3>
+        <div class="table-scroll">
+<table class="squelch-table">
+          <thead>
+            <tr>
+              <th style="width:180px">Mode</th>
+              <th>L1</th><th>L2</th><th>L3</th><th>L4</th>
+              <th>L5</th><th>L6</th><th>L7</th><th>L8</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--text-muted)">MediaSide Output<span class="reg-badge">13h/0xB4</span></td>
+              <td id="lb-mso-0"></td><td id="lb-mso-1"></td><td id="lb-mso-2"></td><td id="lb-mso-3"></td>
+              <td id="lb-mso-4"></td><td id="lb-mso-5"></td><td id="lb-mso-6"></td><td id="lb-mso-7"></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted)">MediaSide Input<span class="reg-badge">13h/0xB5</span></td>
+              <td id="lb-msi-0"></td><td id="lb-msi-1"></td><td id="lb-msi-2"></td><td id="lb-msi-3"></td>
+              <td id="lb-msi-4"></td><td id="lb-msi-5"></td><td id="lb-msi-6"></td><td id="lb-msi-7"></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted)">HostSide Output<span class="reg-badge">13h/0xB6</span></td>
+              <td id="lb-hso-0"></td><td id="lb-hso-1"></td><td id="lb-hso-2"></td><td id="lb-hso-3"></td>
+              <td id="lb-hso-4"></td><td id="lb-hso-5"></td><td id="lb-hso-6"></td><td id="lb-hso-7"></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted)">HostSide Input<span class="reg-badge">13h/0xB7</span></td>
+              <td id="lb-hsi-0"></td><td id="lb-hsi-1"></td><td id="lb-hsi-2"></td><td id="lb-hsi-3"></td>
+              <td id="lb-hsi-4"></td><td id="lb-hsi-5"></td><td id="lb-hsi-6"></td><td id="lb-hsi-7"></td>
+            </tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      <!-- PRBS Generator card -->
+      <div class="card">
+        <h3>PRBS Generator
+          <span style="display:flex;gap:8px">
+            <button class="btn-secondary btn-sm" id="btn-refresh-prbs">↻ Refresh</button>
+            <button class="btn-primary btn-sm"   id="btn-apply-prbs">Apply</button>
+          </span>
+        </h3>
+        <div class="prbs-controls">
+          <div class="prbs-section">
+            <h4>Host-Side<span class="reg-badge">13h/0x90–0x97 (En·Inv·Swap·PreFEC·Pat×4)</span></h4>
+            <div class="table-scroll">
+<table class="prbs-table">
+              <thead><tr><th>Lane</th><th>En</th><th>Inv</th><th>Swap</th><th>PreFEC</th><th>Pattern</th></tr></thead>
+              <tbody id="tbl-prbs-host-gen"></tbody>
+            </table>
+</div>
+          </div>
+          <div class="prbs-section">
+            <h4>Media-Side<span class="reg-badge">13h/0x98–0x9F</span></h4>
+            <div class="table-scroll">
+<table class="prbs-table">
+              <thead><tr><th>Lane</th><th>En</th><th>Inv</th><th>Swap</th><th>PreFEC</th><th>Pattern</th></tr></thead>
+              <tbody id="tbl-prbs-media-gen"></tbody>
+            </table>
+</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRBS Checker card -->
+      <div class="card">
+        <h3>PRBS Checker</h3>
+        <div class="prbs-controls">
+          <div class="prbs-section">
+            <h4>Host-Side<span class="reg-badge">13h/0xA0–0xA7 (En·Inv·Swap·PostFEC·Pat×4)</span></h4>
+            <div class="table-scroll">
+<table class="prbs-table">
+              <thead><tr><th>Lane</th><th>En</th><th>Inv</th><th>Swap</th><th>PostFEC</th><th>Pattern</th><th>LOL</th></tr></thead>
+              <tbody id="tbl-prbs-host-chk"></tbody>
+            </table>
+</div>
+          </div>
+          <div class="prbs-section">
+            <h4>Media-Side<span class="reg-badge">13h/0xA8–0xAF</span></h4>
+            <div class="table-scroll">
+<table class="prbs-table">
+              <thead><tr><th>Lane</th><th>En</th><th>Inv</th><th>Swap</th><th>PostFEC</th><th>Pattern</th><th>LOL</th></tr></thead>
+              <tbody id="tbl-prbs-media-chk"></tbody>
+            </table>
+</div>
+          </div>
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          LOL = Pattern Checker Loss of Lock (14h/0x8A·0x8B). Inv inverts pattern. Swap = MSB/LSB swap for PAM4.
+        </p>
+      </div>
+
+      <!-- BER Results card -->
+      <div class="card">
+        <h3>BER Results
+          <button class="btn-secondary btn-sm" id="btn-refresh-ber">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>BER (F16)<span class="reg-meta">14h / sel=0x01, m×10^(s−24)</span></th>
+              <th>L1</th><th>L2</th><th>L3</th><th>L4</th>
+              <th>L5</th><th>L6</th><th>L7</th><th>L8</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-ber">
+            <tr><td colspan="9" class="placeholder-text">Click ↻ Refresh to read BER.</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      <!-- Error/Bit Counters card -->
+      <div class="card">
+        <h3>Error / Bit Counters
+          <button class="btn-secondary btn-sm" id="btn-refresh-counters">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>Counter<span class="reg-meta">14h / sel=0x02-0x05, U64 LE</span></th>
+              <th>L1</th><th>L2</th><th>L3</th><th>L4</th>
+              <th>L5</th><th>L6</th><th>L7</th><th>L8</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-counters">
+            <tr><td colspan="9" class="placeholder-text">Click ↻ Refresh to read counters.</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      <!-- SNR Results card -->
+      <div class="card">
+        <h3>SNR Results
+          <button class="btn-secondary btn-sm" id="btn-refresh-snr">↻ Refresh</button>
+        </h3>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>SNR (dB)<span class="reg-meta">14h / sel=0x06, u16 LE × 1/256 dB</span></th>
+              <th>L1</th><th>L2</th><th>L3</th><th>L4</th>
+              <th>L5</th><th>L6</th><th>L7</th><th>L8</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-snr">
+            <tr><td colspan="9" class="placeholder-text">Click ↻ Refresh to read SNR.</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      <!-- Laser Tuning card -->
+      <div class="card">
+        <h3>Laser Tuning
+          <span style="display:flex;gap:8px">
+            <button class="btn-secondary btn-sm" id="btn-refresh-laser">↻ Refresh</button>
+            <button class="btn-primary btn-sm"   id="btn-apply-laser">Apply</button>
+          </span>
+        </h3>
+        <div id="laser-caps" style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:10px"></div>
+        <div class="table-scroll">
+<table>
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>Grid<span class="reg-meta">12h/0x80</span></th>
+              <th>Channel<span class="reg-meta">12h/0x88 · S16 dec</span></th>
+              <th>Fine Offset<span class="reg-meta">12h/0x98 · GHz dec</span></th>
+              <th>Frequency<span class="reg-meta">12h/0xA8 · THz dec, RO</span></th>
+              <th>Power<span class="reg-meta">12h/0xC8 · dBm dec</span></th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-laser">
+            <tr><td colspan="7" class="placeholder-text">Click ↻ Refresh to read laser tuning.</td></tr>
+          </tbody>
+        </table>
+</div>
+      </div>
+
+    </div>
+
+    <!-- ===== Tab: Raw Registers ===== -->
+    <div class="tab-panel" id="tab-raw">
+      <div class="card">
+        <h3>Raw Register Access</h3>
+
+        <div class="raw-controls">
+          <div class="field-group">
+            <label for="raw-page">Page (hex/dec)</label>
+            <input type="text" id="raw-page" value="0x00" class="raw-data-input">
+          </div>
+          <div class="field-group">
+            <label for="raw-address">Address (hex/dec)</label>
+            <input type="text" id="raw-address" value="0x00" class="raw-data-input">
+          </div>
+          <div class="field-group">
+            <label for="raw-length">Length (bytes)</label>
+            <input type="number" id="raw-length" value="128" min="1" max="128" class="raw-data-input">
+          </div>
+        </div>
+
+        <div class="field-group" style="margin-bottom:12px">
+          <label for="raw-data">Write Data (space-separated hex, e.g. "1E 50 00")</label>
+          <input type="text" id="raw-data" class="raw-data-input" placeholder="FF 00 1A …">
+        </div>
+
+        <div class="raw-buttons">
+          <button class="btn-primary btn-sm"    id="btn-raw-read">Read</button>
+          <button class="btn-secondary btn-sm"  id="btn-raw-write">Write</button>
+        </div>
+
+        <div class="hex-dump" id="hex-dump">Results will appear here…</div>
+
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          For upper page registers (addr ≥ 0x80), the page is set automatically before read/write.
+          Lower page registers (addr &lt; 0x80) ignore the page field.
+        </p>
+      </div>
+    </div>
+
+    <!-- ===== Tab: EEPROM Bulk Read (up to 1024 bytes, e.g. 24C08) ===== -->
+    <div class="tab-panel" id="tab-eeprom">
+      <div class="card">
+        <h3>EEPROM 读/写
+          <span class="reg-badge">24C02 · 256 B / 24C04 · 512 B / 24C08 · 1024 B</span>
+        </h3>
+
+        <div class="raw-controls eeprom-controls">
+          <div class="field-group">
+            <label for="eep-start">Start Address (hex/dec)</label>
+            <input type="text" id="eep-start" value="0x000" class="raw-data-input">
+          </div>
+          <div class="field-group">
+            <label for="eep-length">Length (bytes)</label>
+            <input type="number" id="eep-length" value="1024" min="1" max="1024" class="raw-data-input">
+          </div>
+          <div class="field-group">
+            <label for="eep-chunk">Chunk (bytes / I2C transfer)</label>
+            <input type="number" id="eep-chunk" value="32" min="1" max="128" class="raw-data-input">
+          </div>
+          <div class="field-group">
+            <label for="eep-chip">EEPROM Chip</label>
+            <select id="eep-chip" class="raw-data-input">
+              <option value="24c08">24C08 [3.3V] — 1024 B · 8 Kbit · 16 B page</option>
+              <option value="24c04">24C04 [3.3V] — 512 B · 4 Kbit · 16 B page</option>
+              <option value="24c02">24C02 [3.3V] — 256 B · 2 Kbit · 8 B page</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="eep-base">Base I2C Address (8-bit, hex/dec)</label>
+            <input type="text" id="eep-base" value="0xA0" class="raw-data-input">
+          </div>
+          <div class="field-group">
+            <label for="eep-serial">Serial Number <span class="eep-label-hint">0x000–0x00B · 12 B ASCII</span></label>
+            <div class="eep-sn-row">
+              <input type="text" id="eep-serial" value="CAD211193882" maxlength="12" spellcheck="false" placeholder="CAD211193882" class="raw-data-input">
+              <button type="button" class="btn-secondary btn-sm" id="btn-eep-sn-next" title="末尾数字 +1">Next</button>
+              <label class="eep-check eep-sn-auto" for="eep-sn-auto"
+                     title="勾选：每次 Write 后 Serial Number 末尾数字 +1；不勾选：只能用 Next 手动递增">
+                <input type="checkbox" id="eep-sn-auto" checked> 自动递增
+              </label>
+            </div>
+            <div class="eep-sn-row eep-sn-pos-row">
+              <label for="eep-sn-pos" title="0-based 字符区间（如 3-9）；留空 = 自动识别最后一段连续数字">递增位置</label>
+              <input type="text" id="eep-sn-pos" value="" maxlength="16" spellcheck="false" placeholder="自动" class="raw-data-input" title="0-based 字符区间（如 3-9）；留空 = 自动识别最后一段连续数字">
+            </div>
+          </div>
+        </div>
+
+        <!-- Chip information, mirroring the programmer's "芯片信息" panel. -->
+        <div class="eep-chip-info" id="eep-chip-info">
+          <div class="eep-chip-info-title">
+            <strong id="eep-ci-name">24C08 [3.3V]</strong>
+            <span>芯片信息 / Chip information</span>
+          </div>
+          <dl class="eep-chip-info-grid">
+            <div><dt>类型 / Type</dt><dd id="eep-ci-type">I2C</dd></div>
+            <div><dt>位容量 / Bits</dt><dd id="eep-ci-bits">8 Kbits</dd></div>
+            <div><dt>厂商 / Vendor</dt><dd id="eep-ci-vendor">GENERIC</dd></div>
+            <div><dt>芯片容量 / Size</dt><dd id="eep-ci-size">1024 Bytes</dd></div>
+            <div><dt>分页 / Page</dt><dd id="eep-ci-page">16 Bytes</dd></div>
+            <div><dt>设备地址 / I2C</dt><dd id="eep-ci-addr">0xA0–0xA6 (4 × 256 B)</dd></div>
+          </dl>
+        </div>
+
+        <div class="eep-file-row">
+          <div class="field-group">
+            <label for="eep-file">BIN Image <span class="eep-label-hint" title="选中 .bin 并勾选「烧写空白」后，若读取到空白芯片（前 12 位全 0xFF），会自动把该镜像连同递增后的序列号静默烧写">optional — 勾选「烧写空白」后读空白芯片自动烧写</span></label>
+            <input type="file" id="eep-file" accept=".bin,application/octet-stream" class="raw-data-input">
+          </div>
+          <button type="button" class="btn-secondary btn-sm eep-file-refresh" id="btn-eep-file-refresh"
+                  title="重新读取已选中的 .bin 并刷新下方内容区" disabled>刷新</button>
+          <div class="eep-file-meta" id="eep-file-info">No .bin file loaded.</div>
+        </div>
+        <div class="eep-write-preview" id="eep-write-preview"></div>
+
+        <div class="raw-buttons eep-buttons">
+          <button class="btn-primary btn-sm"   id="btn-eep-read">读取</button>
+          <button class="btn-secondary btn-sm" id="btn-eep-export" disabled>保存 .bin</button>
+          <button class="btn-secondary btn-sm" id="btn-eep-copy"   disabled>复制 Hex</button>
+          <button class="btn-secondary btn-sm" id="btn-eep-clear">清除</button>
+          <button class="btn-danger btn-sm"   id="btn-eep-erase"
+                  title="把整片 EEPROM 全部写成 0xFF（物理擦除，不可逆），始终弹确认框；序列号不变、不递增">清空芯片</button>
+          <button class="btn-danger btn-sm"   id="btn-eep-write" disabled>写入→ EEPROM</button>
+          <label class="eep-check"><input type="checkbox" id="eep-verify" checked> 校验</label>
+          <label class="eep-check eep-arm" for="eep-arm-write"
+                 title="勾选：点击 Write 先弹出确认框；不勾选：直接写入，不弹任何提示框">
+            <input type="checkbox" id="eep-arm-write" checked> 确认
+          </label>
+          <label class="eep-check eep-auto-update" for="eep-auto-update"
+                 title="勾选后：读取时若前 12 位序列号符合耗材规则，且 0x09C–0x09D 消耗量不是 100%，自动改为 100% 并静默写回 EEPROM（不弹确认、序列号不递增）">
+            <input type="checkbox" id="eep-auto-update"> 自动更新
+          </label>
+          <label class="eep-check eep-blank-program" for="eep-blank-program"
+                 title="勾选后：读取时若芯片前 12 字节全为 0xFF（空白芯片），且已选择 bin 文件、序列号已从 bin 读出，则把 bin 内容连同递增后的序列号自动烧写入 EEPROM（不弹确认框）；默认不勾选，不勾选则读取只显示不做任何写入">
+            <input type="checkbox" id="eep-blank-program"> 烧写空白
+          </label>
+        </div>
+
+        <div id="eep-status" class="eep-status">Ready.</div>
+        <div class="hex-dump hex-dump-tall" id="eep-dump">Results will appear here…</div>
+        <div id="eep-summary" class="eep-summary"></div>
+
+        <p class="eep-warning">
+          ⚠ <strong>Write is irreversible.</strong> It overwrites the EEPROM contents — never
+          point it at a live CMIS optical module. Leave <em>确认 / Confirm</em> unticked for
+          one-click programming (no dialog, no toast); tick it to require the 确定 / 取消
+          confirmation. Unlike Raw Registers, neither Read nor Write touches byte 0x7F as a
+          page-select register: on a plain EEPROM that byte is data.
+        </p>
+        <p style="font-size:var(--fs-xs);color:var(--muted);margin-top:8px">
+          <strong>Read</strong> — <em>24C02</em> is one 256-byte device at 8-bit address 0xA0
+          (8-byte pages), <em>24C04</em> is two 256-byte blocks at 0xA0–0xA2, and <em>24C08</em>
+          is four at 0xA0–0xA6 (both 16-byte pages). Addresses are shown as 8-bit (7-bit slave
+          address left-shifted by one, e.g. 0x50 → 0xA0); the tool converts back to 7-bit for
+          the driver. A dump covering 0x000–0x00B decodes the chip's current Serial Number.
+          On a CMIS optical module read only the first 256 bytes: 0xA2/0xA4/0xA6 do not exist
+          there.<br>
+          <strong>Read → Write</strong> — a successful Read makes the content-area dump the
+          image to program, <strong>enables the Write button without any .bin file</strong>, and
+          copies the 12 ASCII bytes at 0x000–0x00B into the Serial Number field. This supports
+          "read a golden part → program the next boards" directly. A failed Read keeps the
+          previous image; Clear and disconnect discard a chip readback.<br>
+          <strong>Select file</strong> — the chosen .bin is immediately shown in the content
+          area below, and its first 12 ASCII bytes (0x000–0x00B) are loaded into the Serial Number
+          field, e.g. <code>CAD211193882</code>. Whichever came last — Read or file —
+          is what Write programs.<br>
+          <strong>Write</strong> — with <em>确认 / Confirm</em> unticked (default), a Write
+          click programs the content area <strong>immediately</strong>: no dialog, no toast,
+          no extra click. Tick it only when you want a confirmation step; the in-page dialog
+          then sits just <em>above the Write button</em> with 确定 / 取消 in its last row, so
+          the mouse barely moves (a browser-native confirm() is pinned to the top of the
+          window and cannot be moved). 确定 is focused, so <em>Enter</em> confirms;
+          Esc / 取消 / the backdrop abort without writing. Write then replaces bytes
+          0x000–0x00B with those 12 ASCII characters, and programs the image
+          in page-sized pieces (8 B / 16 B), split again at each 256-byte
+          block boundary. Every page is followed by a 10 ms write-cycle wait; <em>Verify</em>
+          re-reads each page and reports mismatches. The Serial Number is a 12-character
+          printable ASCII string (e.g. <code>CAD211193882</code>) kept in this browser. With
+          <em>自动递增 / Auto-increment</em> ticked (default), the digit run selected by
+          <em>递增位置 / Increment at</em>
+          <strong>increments by 1 on every Write that is actually sent</strong>;
+          <strong>letters never change</strong>, so <code>CAA2127891EB</code> →
+          <code>CAA2127892EB</code>. Leave 递增位置 empty to auto-detect the last digit
+          run, or enter a 0-based inclusive range like <code>3-9</code> to pin exactly
+          which characters may change. Untick it
+          and the S/N stays put across writes — advance it only with <em>Next</em>. Reading the
+          chip or selecting a .bin reloads the value from the content area's 0x000–0x00B
+          automatically. The Mock demo backend rewrites dynamic registers (e.g. 0x03,
+          0x0E–0x0F) on every read, so <em>Verify</em> can report false mismatches there; real
+          24C02/24C04/24C08 hardware is not affected.
+        </p>
+      </div>
+    </div>
+
+  </div><!-- .content -->
+</main>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+</div><!-- #app-shell -->
+
+<!-- Write confirmation — outside the shell, like the display-settings dialog:
+     a modal <dialog> is promoted to the top layer, so it needs its own zoom.
+     A native window.confirm() is pinned to the TOP of the viewport by the
+     browser and JS cannot move it; this one is anchored just ABOVE
+     btn-eep-write, with 确定 / 取消 in the LAST row so OK lands within a few
+     pixels of the button that was just clicked. -->
+<dialog id="eep-confirm-dialog" class="eep-confirm-dialog"
+        aria-labelledby="eep-confirm-title">
+  <form method="dialog" class="eep-confirm-form">
+    <pre class="eep-confirm-text" id="eep-confirm-text"></pre>
+    <div class="eep-confirm-actions">
+      <button type="submit" value="ok" class="btn-danger btn-sm"
+              id="eep-confirm-ok" title="确认写入 (Enter)">确定</button>
+      <button type="submit" value="cancel" class="btn-secondary btn-sm"
+              id="eep-confirm-cancel" title="取消 (Esc)">取消</button>
+      <strong class="eep-confirm-title" id="eep-confirm-title">Confirm EEPROM write</strong>
+    </div>
+  </form>
+</dialog>
+
+<!-- Outside the shell, and carrying its own zoom: a dialog is promoted to the
+     top layer, which changes its containing block, so inheriting the shell's
+     scale is not something to depend on. -->
+<dialog id="settings-dialog">
+  <form method="dialog" class="settings-form">
+    <h3>Display</h3>
+
+    <div class="field-group">
+      <label for="set-theme">Theme</label>
+      <select id="set-theme">
+        <option value="midnight">Midnight (default)</option>
+        <option value="light">Light</option>
+        <option value="contrast">High contrast</option>
+        <option value="warm">Warm — low blue light</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label for="set-scale">UI scale</label>
+      <select id="set-scale">
+        <option value="auto">Auto — match this screen</option>
+        <option value="0.8">80%</option>
+        <option value="0.9">90%</option>
+        <option value="1">100%</option>
+        <option value="1.15">115%</option>
+        <option value="1.25">125%</option>
+        <option value="1.5">150%</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label for="set-fontstep">Text size</label>
+      <select id="set-fontstep">
+        <option value="-1">Compact</option>
+        <option value="0">Normal</option>
+        <option value="2">Large</option>
+        <option value="4">Extra large</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label for="set-font">Font</label>
+      <select id="set-font">
+        <option value="system">System default</option>
+        <option value="yahei" style="font-family:'Microsoft YaHei'">Microsoft YaHei</option>
+        <option value="source" style="font-family:'Source Han Sans SC','Noto Sans SC'">Source Han Sans</option>
+        <option value="mono" style="font-family:Consolas,monospace">Monospace everywhere</option>
+      </select>
+    </div>
+
+    <p class="settings-note">
+      Register addresses, hex dumps and monitoring values stay monospace whatever
+      you pick here, so digits keep lining up.
+    </p>
+
+    <div class="settings-actions">
+      <button type="button" class="btn-secondary btn-sm" id="btn-settings-reset">Reset to defaults</button>
+      <button type="submit" class="btn-primary btn-sm">Done</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

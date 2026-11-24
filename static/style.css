@@ -1,0 +1,1295 @@
+/* CMIS Module Manager — themeable stylesheet.
+
+   Colours live only in the palette blocks below. Anything outside them that
+   names a colour breaks whichever theme it was not picked for, so a test
+   refuses hex literals in the rest of this file. */
+
+/* ---- Tokens that do not vary by theme ---- */
+:root {
+  --radius: 6px;
+  --font-mono: 'Consolas', 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+
+  /* One additive step moves every size together. Multiplying instead would
+     keep the 10px register annotations permanently 1.4x smaller than body
+     text; adding lets the smallest labels catch up, which is the whole point
+     of a text-size control that sits next to a zoom control. */
+  --fs-step: 0px;
+  --fs-2xs:  calc(10px + var(--fs-step));
+  --fs-xs:   calc(11px + var(--fs-step));
+  --fs-sm:   calc(12px + var(--fs-step));
+  --fs-md:   calc(13px + var(--fs-step));
+  --fs-base: calc(14px + var(--fs-step));
+  --fs-h1:   calc(18px + var(--fs-step));
+
+  --ui-zoom: 1;
+}
+
+/* ---- Palette: midnight (the original dark theme, and the default) ---- */
+:root,
+:root[data-theme="midnight"] {
+  color-scheme: dark;
+  --bg: #1e1e2e;
+  --surface: #2a2a3e;
+  --surface2: #313145;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --muted: #64748b;
+  --border: #3f3f5a;
+
+  --on-accent: #fff;
+  --danger-fg: #fca5a5;
+  --warning-fg: #fde68a;
+  --success-fg: #86efac;
+  --accent-fg: #c4b5fd;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+
+  --toast-ok-bg: #14532d;   --toast-ok-fg: #bbf7d0;   --toast-ok-bd: #166534;
+  --toast-err-bg: #7f1d1d;  --toast-err-fg: #fecaca;  --toast-err-bd: #991b1b;
+  --toast-info-bg: #1e1b4b; --toast-info-fg: #c7d2fe; --toast-info-bd: #3730a3;
+
+  --badge-ok-bg: #14532d;   --badge-ok-fg: #bbf7d0;
+  --btn-danger-bg: #7f1d1d; --btn-danger-fg: #fca5a5; --btn-danger-hover: #991b1b;
+
+  /* The QR is white-on-black artwork: screen drops the black field. */
+  --qr-blend: screen;
+  --qr-filter: none;
+  --qr-opacity: 0.55;
+
+  /* A custom property can hold the whole url() token, which is how the arrow
+     colour follows the theme — a var cannot be interpolated inside the string. */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
+}
+
+/* ---- Palette: light ---- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface2: #f1f5f9;
+  --accent: #6d28d9;
+  --accent-hover: #5b21b6;
+  --text: #0f172a;
+  --text-muted: #475569;
+  /* Darker than the dark-theme trio: the same green and amber that read as
+     bright on #1e1e2e fail contrast against white. */
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #dc2626;
+  --muted: #64748b;
+  --border: #cbd5e1;
+
+  --on-accent: #ffffff;
+  --danger-fg: #991b1b;
+  --warning-fg: #92400e;
+  --success-fg: #166534;
+  --accent-fg: #5b21b6;
+  --shadow-color: rgba(15, 23, 42, 0.15);
+
+  --toast-ok-bg: #dcfce7;   --toast-ok-fg: #14532d;   --toast-ok-bd: #86efac;
+  --toast-err-bg: #fee2e2;  --toast-err-fg: #7f1d1d;  --toast-err-bd: #fca5a5;
+  --toast-info-bg: #ede9fe; --toast-info-fg: #4c1d95; --toast-info-bd: #c4b5fd;
+
+  --badge-ok-bg: #dcfce7;   --badge-ok-fg: #14532d;
+  --btn-danger-bg: #fee2e2; --btn-danger-fg: #991b1b; --btn-danger-hover: #fecaca;
+
+  /* Inverting first turns the white-on-black artwork into black-on-white;
+     multiply then drops the (now white) field. Multiply alone would leave a
+     polarity-reversed code that many scanners reject. */
+  --qr-blend: multiply;
+  --qr-filter: invert(1);
+  --qr-opacity: 0.9;
+
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23475569'/%3E%3C/svg%3E");
+}
+
+/* ---- Palette: high contrast (bright rooms, projectors) ---- */
+:root[data-theme="contrast"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0d0d0d;
+  --surface2: #1a1a1a;
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --text: #ffffff;
+  --text-muted: #d4d4d8;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --muted: #a1a1aa;
+  --border: #52525b;
+
+  --on-accent: #000000;
+  --danger-fg: #fecaca;
+  --warning-fg: #fef08a;
+  --success-fg: #bbf7d0;
+  --accent-fg: #ddd6fe;
+  --shadow-color: rgba(0, 0, 0, 0.8);
+
+  --toast-ok-bg: #052e16;   --toast-ok-fg: #bbf7d0;   --toast-ok-bd: #4ade80;
+  --toast-err-bg: #450a0a;  --toast-err-fg: #fecaca;  --toast-err-bd: #f87171;
+  --toast-info-bg: #1e1b4b; --toast-info-fg: #ddd6fe; --toast-info-bd: #a78bfa;
+
+  --badge-ok-bg: #052e16;   --badge-ok-fg: #bbf7d0;
+  --btn-danger-bg: #450a0a; --btn-danger-fg: #fecaca; --btn-danger-hover: #7f1d1d;
+
+  --qr-blend: screen;
+  --qr-filter: none;
+  --qr-opacity: 0.75;
+
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23d4d4d8'/%3E%3C/svg%3E");
+}
+
+/* ---- Palette: warm (low blue light, for long sessions) ---- */
+:root[data-theme="warm"] {
+  color-scheme: dark;
+  --bg: #2b2620;
+  --surface: #35302a;
+  --surface2: #403a33;
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --text: #f5ede0;
+  --text-muted: #c4b5a0;
+  --success: #9ccc65;
+  --warning: #e0a030;
+  --danger: #e07a5f;
+  /* Lightened until --muted clears 4.5:1 on both --surface and --bg; the
+     10px register annotations are drawn in it. */
+  --muted: #a3968a;
+  --border: #4f473d;
+
+  --on-accent: #1c1917;
+  --danger-fg: #f4b8a5;
+  --warning-fg: #f0d9a0;
+  --success-fg: #cfe8a8;
+  --accent-fg: #f0c896;
+  --shadow-color: rgba(0, 0, 0, 0.45);
+
+  --toast-ok-bg: #33401f;   --toast-ok-fg: #cfe8a8;   --toast-ok-bd: #5c7030;
+  --toast-err-bg: #4a2118;  --toast-err-fg: #f4b8a5;  --toast-err-bd: #7d3a2a;
+  --toast-info-bg: #45341c; --toast-info-fg: #f0c896; --toast-info-bd: #8a6320;
+
+  --badge-ok-bg: #33401f;   --badge-ok-fg: #cfe8a8;
+  --btn-danger-bg: #4a2118; --btn-danger-fg: #f4b8a5; --btn-danger-hover: #6b2f22;
+
+  --qr-blend: screen;
+  --qr-filter: none;
+  --qr-opacity: 0.55;
+
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c4b5a0'/%3E%3C/svg%3E");
+}
+
+/* ---- Font presets. Stored preferences hold these ids, never a CSS string,
+       so nothing the user has saved is ever injected into a style value and
+       the stacks can be improved later without migrating anything.
+       --font-mono is deliberately never reassigned: hex dumps, register
+       addresses and monitoring values have to keep their columns aligned. ---- */
+:root[data-font-sans="yahei"]  { --font-sans: 'Microsoft YaHei', sans-serif; }
+:root[data-font-sans="source"] { --font-sans: 'Source Han Sans SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; }
+:root[data-font-sans="mono"]   { --font-sans: var(--font-mono); }
+
+/* ---- Tints derived from the palette, so a theme only sets the base colour.
+       Mixing an opaque colour with transparent keeps its channels and scales
+       only alpha, so these reproduce the original rgba() values exactly. ---- */
+:root {
+  --danger-04: color-mix(in srgb, var(--danger) 4%, transparent);
+  --danger-08: color-mix(in srgb, var(--danger) 8%, transparent);
+  --danger-12: color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-15: color-mix(in srgb, var(--danger) 15%, transparent);
+  --danger-20: color-mix(in srgb, var(--danger) 20%, transparent);
+  --warning-04: color-mix(in srgb, var(--warning) 4%, transparent);
+  --warning-08: color-mix(in srgb, var(--warning) 8%, transparent);
+  --warning-12: color-mix(in srgb, var(--warning) 12%, transparent);
+  --warning-15: color-mix(in srgb, var(--warning) 15%, transparent);
+  --warning-20: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+}
+
+/* ---- Layout ---- */
+/* The shell owns the viewport so nothing has to know the header's height.
+   inset:0 is what makes the UI scale safely: zoom multiplies lengths, and
+   zero times any factor is still zero, so the shell covers the viewport
+   exactly at every scale without a compensation term. Its inner coordinate
+   space then becomes viewport/zoom, which is what the contents lay out in. */
+#app-shell {
+  position: fixed;
+  inset: 0;
+  zoom: var(--ui-zoom);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: inline-size;
+  container-name: app;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* Wraps rather than squeezing its contents once the window gets narrow. */
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+header h1 {
+  font-size: var(--fs-h1);
+  font-weight: 600;
+  color: var(--text);
+}
+.btn-update {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-update:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.btn-update:disabled { opacity: .55; cursor: default; }
+/* An available update should be noticed without being alarming. */
+.btn-update.update-available {
+  color: var(--warning-fg);
+  border-color: var(--warning);
+  background: var(--warning-12);
+}
+.stale-banner {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-12);
+  color: var(--danger-fg);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+/* Data that failed to refresh must not look live. */
+.stale-data {
+  opacity: .45;
+  filter: grayscale(1);
+  outline: 1px dashed var(--danger);
+}
+.sidebar-about {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+.version-badge {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .3px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--bg);
+  margin-left: -8px;
+}
+
+/* Pushes the status and the gear to the right, filling the empty half of the
+   header that the title, version badge and Update button leave behind. */
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-md);
+  margin-left: auto;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s;
+}
+
+.status-dot.connected { background: var(--success); }
+.status-dot.disconnected { background: var(--danger); }
+
+/* min-height:0 is load-bearing: a flex item defaults to min-height:auto and
+   refuses to shrink below its content, which would stop .tab-panel from ever
+   scrolling and push the shell past the viewport. */
+main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---- Sidebar (connection panel) ---- */
+.sidebar {
+  width: 260px;
+  min-width: 220px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.sidebar h2 {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+label {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+select, input[type="text"], input[type="number"] {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+select:focus, input:focus {
+  border-color: var(--accent);
+}
+
+select option {
+  background: var(--surface2);
+}
+
+button {
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  width: 100%;
+}
+
+.btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+.btn-danger {
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-fg);
+  width: 100%;
+}
+
+.btn-danger:hover:not(:disabled) { background: var(--btn-danger-hover); }
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* ---- Tab content area ---- */
+/* overflow:hidden also gives this flex item an effective min-width of 0;
+   without it a wide table would push the sidebar out of shape. */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+}
+
+.tab-btn {
+  background: none;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+
+.tab-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-btn:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+.tab-panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.tab-panel.active {
+  display: block;
+  container-type: inline-size;
+  container-name: panel;
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* Flex rather than floated buttons: a float overlaps the title once the panel
+   is a couple of hundred pixels narrower. */
+.card h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+}
+
+/* Wide tables scroll inside their card instead of spilling over its border.
+   The counters table alone reaches ~1300px once total_bits grows to 18 digits,
+   which is a few minutes into any run. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* ---- Tables ---- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+
+th {
+  text-align: left;
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: var(--fs-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+}
+
+tr:last-child td { border-bottom: none; }
+
+tr:hover td { background: var(--surface2); }
+
+/* ---- Alarm coloring ---- */
+.alarm-high {
+  background: var(--danger-15) !important;
+  color: var(--danger-fg);
+}
+
+.alarm-low {
+  background: var(--warning-15) !important;
+  color: var(--warning-fg);
+}
+
+.state-activated { color: var(--success); }
+.state-init { color: var(--warning); }
+.state-deactivated { color: var(--muted); }
+
+/* ---- Monitoring: all-lanes-activated status dot ---- */
+.monitor-all-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  margin-left: 8px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 4px var(--success); }
+  50%       { box-shadow: 0 0 10px var(--success); }
+}
+
+/* ---- Monitoring controls ---- */
+.monitoring-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.monitoring-controls label {
+  font-size: var(--fs-md);
+  color: var(--text);
+}
+
+.monitoring-controls select {
+  width: auto;
+}
+
+/* ---- DataPath config ---- */
+.datapath-lane-row td:first-child {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* AppSelect inside the DataPath table — explicit dark theme override so
+   native OS styling does not bleed through on Windows/Linux */
+.app-select-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  width: auto;
+  min-width: 90px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  /* Override system appearance so background/color apply on all browsers */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  /* Arrow colour rides on the theme; see --select-arrow. */
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  padding-right: 22px;
+}
+
+.app-select-input:focus {
+  border-color: var(--accent);
+}
+
+.app-select-input option {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* ---- Raw register tab ---- */
+.raw-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.raw-data-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  outline: none;
+}
+
+.raw-data-input:focus { border-color: var(--accent); }
+
+.hex-dump {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  white-space: pre;
+  overflow-x: auto;
+  min-height: 80px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.raw-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.raw-buttons button {
+  width: auto;
+}
+
+/* ---- EEPROM bulk-read tab ---- */
+.eeprom-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+
+.eeprom-controls select.raw-data-input {
+  padding: 6px 8px;
+}
+
+/* A 1024-byte dump is 64 rows; cap the height so the page stays usable. */
+.hex-dump-tall {
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.eep-status, .eep-summary {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 8px;
+  min-height: 1.2em;
+}
+
+.eep-status {
+  padding: 7px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.eep-summary { color: var(--text-muted); }
+
+/* ---- EEPROM serial number + BIN programming ---- */
+.eep-label-hint {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.eep-sn-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* "> input" only: the auto-increment checkbox lives inside a <label>, and a
+   plain descendant selector would stretch that checkbox to fill the row. */
+.eep-sn-row > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.eep-sn-row button {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 4px 8px;
+}
+
+.eep-sn-row .eep-sn-auto { flex: 0 0 auto; padding: 0 2px; }
+
+/* Optional increment-position control: a 0-based digit range such as '3-9'.
+   Label and input share one compact row; the explanation lives in title=. */
+.eep-sn-pos-row { margin-top: 6px; align-items: center; }
+.eep-sn-pos-row > label {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.eep-sn-pos-row > input {
+  flex: 0 1 132px;
+  width: 132px;
+  font-family: var(--font-mono);
+}
+
+.eep-file-meta,
+.eep-write-preview {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.eep-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) auto minmax(0, 3fr);
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+/* 刷新: re-read the selected file into the content area.
+   Compact padding; the button now sits before the file-size meta. */
+.eep-file-refresh {
+  align-self: end;
+  white-space: nowrap;
+  padding: 4px 6px;
+}
+
+.eep-file-row input[type="file"] {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  font-size: var(--fs-sm);
+  width: 100%;
+  max-width: 100%;
+}
+
+.eep-file-meta { padding-bottom: 4px; }
+.eep-write-preview { margin-bottom: 10px; min-height: 1.2em; }
+
+.eep-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.eep-check input { width: auto; accent-color: var(--accent); }
+
+/* The opt-in "require confirmation" switch stands out from the passive
+   "Verify" option next to it; unticked still writes, just without a dialog. */
+.eep-arm { color: var(--danger-fg); }
+
+/* "Auto update" repairs the consumption field silently after a Read. Keep it
+   visually distinct from the red "Confirm" switch: it is an opt-in helper,
+   not a destructive-mode warning, and defaults to off. */
+.eep-auto-update { color: var(--accent); }
+/* "烧写空白": opt-in auto-program of an erased chip. Red like Confirm because
+   it writes to hardware; off by default so a plain Read is always read-only. */
+.eep-blank-program { color: var(--danger-fg); }
+.eep-blank-program input { accent-color: var(--danger); }
+.eep-arm input { accent-color: var(--danger); }
+
+.eep-buttons { align-items: center; flex-wrap: wrap; }
+
+/* ---- In-page write confirmation ----
+   Anchored by JS just ABOVE btn-eep-write. The UA centres modal dialogs with
+   inset:0 + margin:auto; opting out lets us keep OK next to the cursor. The
+   action row is the LAST row, so 确定 sits a few pixels above the Write button. */
+.eep-confirm-dialog {
+  zoom: var(--ui-zoom);
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  top: 0;
+  left: 0;                    /* replaced with real coordinates on open */
+  width: min(460px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: 0 10px 32px var(--shadow-color);
+}
+
+.eep-confirm-dialog::backdrop { background: var(--shadow-color); }
+
+/* Flex column lets the below-anchor fallback move 确定 / 取消 back to the
+   first row without touching the DOM (see openEepromConfirmDialog()). */
+.eep-confirm-form { display: flex; flex-direction: column; }
+
+.eep-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  order: 1;
+}
+
+.eep-confirm-actions button {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 5px 14px;
+}
+
+.eep-confirm-title {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--danger-fg);
+}
+
+.eep-confirm-text {
+  order: 0;
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Not enough room above the Write button: the dialog drops below it and the
+   action row goes back to the top, so 确定 is still next to the cursor. */
+.eep-confirm-dialog.eep-confirm-below .eep-confirm-actions { order: -1; }
+.eep-confirm-dialog.eep-confirm-below .eep-confirm-text { margin: 10px 0 0; }
+
+.eep-warning {
+  font-size: var(--fs-xs);
+  color: var(--danger-fg);
+  background: var(--danger-08);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+
+@container panel (max-width: 620px) {
+  .eep-file-row { grid-template-columns: 1fr; }
+}
+
+/* Chip information card — mirrors the programmer's 芯片信息 panel */
+.eep-chip-info {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px 12px;
+  margin-bottom: 12px;
+}
+
+.eep-chip-info-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eep-chip-info-title strong {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  color: var(--text);
+}
+
+.eep-chip-info-title span {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.eep-chip-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.eep-chip-info-grid > div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.eep-chip-info-grid dt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.eep-chip-info-grid dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Toast notifications ---- */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+}
+
+.toast {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
+  max-width: 320px;
+  animation: slideIn 0.2s ease;
+  box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.toast-success { background: var(--toast-ok-bg);   color: var(--toast-ok-fg);   border: 1px solid var(--toast-ok-bd); }
+.toast-error   { background: var(--toast-err-bg);  color: var(--toast-err-fg);  border: 1px solid var(--toast-err-bd); }
+.toast-info    { background: var(--toast-info-bg); color: var(--toast-info-fg); border: 1px solid var(--toast-info-bd); }
+
+@keyframes slideIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ---- Loading spinner ---- */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Util ---- */
+.text-mono { font-family: var(--font-mono); }
+.text-muted { color: var(--text-muted); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger  { color: var(--danger); }
+.mt-8 { margin-top: 8px; }
+.placeholder-text {
+  color: var(--muted);
+  text-align: center;
+  padding: 40px;
+  font-style: italic;
+}
+
+/* ---- WeChat QR code (sidebar bottom) ---- */
+.sidebar-qr-wrap {
+  margin-top: auto;
+  padding-top: 16px;
+  text-align: center;
+}
+
+.sidebar-qr {
+  width: 88%;
+  max-width: 180px;
+  border-radius: 6px;
+  mix-blend-mode: var(--qr-blend);
+  filter: var(--qr-filter);
+  opacity: var(--qr-opacity);
+  transition: opacity 0.25s;
+  display: block;
+  margin: 0 auto;
+}
+
+.sidebar-qr:hover {
+  opacity: 0.85;
+}
+
+.sidebar-qr-label {
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+/* ---- Backend info area (sidebar) ---- */
+#backend-info-area {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* ---- Backend availability badge ---- */
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.badge-ok  { background: var(--badge-ok-bg); color: var(--badge-ok-fg); }
+.badge-off { background: var(--border); color: var(--muted); }
+
+/* ---- Lane flag indicators ---- */
+.flag-active {
+  color: var(--danger-fg);
+  background: var(--danger-20);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.flag-warn {
+  color: var(--warning-fg);
+  background: var(--warning-20);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.flag-ok {
+  color: var(--success);
+  font-size: var(--fs-2xs);
+}
+
+/* ---- Threshold table tint ---- */
+.threshold-table td.ha, td.ha { background: var(--danger-08); }
+.threshold-table td.hw, td.hw { background: var(--warning-08); }
+.threshold-table td.la, td.la { background: var(--danger-04); }
+.threshold-table td.lw, td.lw { background: var(--warning-04); }
+
+/* Column headers for threshold table */
+.th-ha { color: var(--danger-fg) !important; }
+.th-la { color: var(--danger-fg) !important; opacity: 0.7; }
+.th-hw { color: var(--warning-fg) !important; }
+.th-lw { color: var(--warning-fg) !important; opacity: 0.7; }
+
+/* ---- Squelch / Loopback bitmask table ---- */
+.squelch-table td {
+  text-align: center;
+  padding: 5px 4px;
+}
+
+.squelch-table th {
+  text-align: center;
+}
+
+.squelch-table td:first-child {
+  text-align: left;
+  padding-left: 10px;
+}
+
+/* ---- Register metadata annotations ---- */
+.reg-meta {
+  display: block;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+/* columns for row-based info tables (Module Info, Thresholds) */
+.td-page,
+.td-addr {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.td-def {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  line-height: 1.4;
+}
+/* compact register badge used in row labels */
+.reg-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  vertical-align: middle;
+  line-height: 1.6;
+}
+
+/* ---- PRBS controls layout ---- */
+.prbs-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.prbs-section h4 {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.prbs-table td {
+  text-align: center;
+  padding: 4px 8px;
+}
+
+.prbs-table td:first-child {
+  text-align: left;
+  color: var(--text-muted);
+}
+
+.prbs-table th {
+  text-align: center;
+}
+
+/* ---- Responsive: container queries, never media queries ----
+   @media measures the unzoomed viewport, so every breakpoint would silently
+   stop matching as soon as the user changes the UI scale. @container measures
+   the container's own inner size, which is post-zoom, so the two compose. */
+@container panel (max-width: 940px) {
+  .prbs-controls { grid-template-columns: 1fr; }
+}
+
+@container panel (max-width: 620px) {
+  .raw-controls { grid-template-columns: 1fr; }
+  .eep-chip-info-grid { grid-template-columns: 1fr; }
+}
+
+@container app (max-width: 1200px) {
+  .sidebar { width: 200px; min-width: 180px; }
+}
+
+@container app (max-width: 900px) {
+  .sidebar { width: 176px; min-width: 160px; padding: 12px; }
+}
+
+/* ---- Display settings dialog ----
+   A native <dialog> brings the top layer, a backdrop, Escape-to-close and a
+   focus trap with it; this app had no modal layer at all before. */
+#settings-dialog {
+  zoom: var(--ui-zoom);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 340px;
+  max-width: 92vw;
+  box-shadow: 0 8px 32px var(--shadow-color);
+}
+
+#settings-dialog::backdrop {
+  background: var(--shadow-color);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-form h3 {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-note {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* .btn-primary and .btn-secondary are full-width for the sidebar form. */
+.settings-actions button {
+  width: auto;
+}
